@@ -866,6 +866,15 @@ class Message(ChatGetter, SenderGetter, TLObject):
             return await self._client.send_message(
                 await self.get_input_chat(), *args, **kwargs)
 
+    async def react(self, *args, **kwargs):
+        """
+        Reacts to the message. Shorthand for
+        `telethon.client.messages.MessageMethods.send_reaction`.
+        """
+        if self._client:
+            return await self._client.send_reaction(
+                self.chat_id, self.id, *args, **kwargs)
+
     async def forward_to(self, *args, **kwargs):
         """
         Forwards the message. Shorthand for
