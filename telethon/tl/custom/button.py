@@ -373,11 +373,25 @@ class Button:
     def mention(text, user):
         """Send Button with UserProfile mention.
 
-        call 'get_input_entity' to fill in user parameter."""
-        if hasattr(types, "KeyboardInlineButton") and hasattr(types, "InlineButtonTypeUserProfile"):
-            return types.KeyboardInlineButton(
-                text, types.InlineButtonTypeUserProfile(user),
-                style=Button._get_style(None, None)
-            )
+        Prefer an integer user id. ``get_input_entity`` / ``InputPeerUser``
+        values are accepted and coerced — layer 230's
+        ``InlineButtonTypeUserProfile`` packs ``user_id`` as ``<q>``.
+        """
+        user_id = user
+        if not isinstance(user_id, int):
+            user_id = getattr(user, 'user_id', None)
+            if user_id is None:
+                user_id = getattr(user, 'id', None)
+            if user_id is None:
+                peer = getattr(user, 'peer_id', None)
+                user_id = getattr(peer, 'user_id', None)
 
+        if hasattr(types, "KeyboardInlineButton") and hasattr(types, "InlineButtonTypeUserProfile"):
+            if isinstance(user_id, int):
+                return types.KeyboardInlineButton(
+                    text, types.InlineButtonTypeUserProfile(user_id),
+                    style=Button._get_style(None, None)
+                )
+
+        # Legacy constructor still wants an InputUser / InputPeer.
         return types.InputKeyboardButtonUserProfile(text, user)
