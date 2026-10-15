@@ -188,6 +188,11 @@ class Button:
         
     @staticmethod
     def mention(text, user_id):
+        if not hasattr(types, "InputKeyboardButtonUserProfile"):
+            raise TypeError(
+                'reply keyboards no longer support user profile buttons '
+                'in the current layer; use the inline buttons instead')
+
         return types.InputKeyboardButtonUserProfile(text, user_id)
 
     @classmethod
@@ -373,25 +378,35 @@ class Button:
     def mention(text, user):
         """Send Button with UserProfile mention.
 
-        Prefer an integer user id. ``get_input_entity`` / ``InputPeerUser``
-        values are accepted and coerced — layer 230's
-        ``InlineButtonTypeUserProfile`` packs ``user_id`` as ``<q>``.
-        """
-        user_id = user
-        if not isinstance(user_id, int):
-            user_id = getattr(user, 'user_id', None)
-            if user_id is None:
-                user_id = getattr(user, 'id', None)
-            if user_id is None:
-                peer = getattr(user, 'peer_id', None)
-                user_id = getattr(peer, 'user_id', None)
+        `user` may be a user ID (`int`) or a user entity/input user, such
+        as the result of calling `get_input_entity`."""
+        # The layer decides whether the button holds a plain `long` user
+        # ID or a full `InputUser`, so accept both and normalise.
+        if isinstance(user, int):
+            user_id = user
+            input_user = types.InputUser(user, 0)
+        else:
+            input_user = utils.get_input_user(user)
+            user_id = getattr(input_user, 'user_id', None)
 
-        if hasattr(types, "KeyboardInlineButton") and hasattr(types, "InlineButtonTypeUserProfile"):
-            if isinstance(user_id, int):
+        if hasattr(types, "KeyboardInlineButton"):
+            if hasattr(types, "InputInlineButtonTypeUserProfile"):
+                # Contains an `InputUser`, like the old
+                # `InputKeyboardButtonUserProfile` used to take.
                 return types.KeyboardInlineButton(
-                    text, types.InlineButtonTypeUserProfile(user_id),
+                    text,
+                    types.InputInlineButtonTypeUserProfile(input_user),
                     style=Button._get_style(None, None)
                 )
 
-        # Legacy constructor still wants an InputUser / InputPeer.
-        return types.InputKeyboardButtonUserProfile(text, user)
+            if hasattr(types, "InlineButtonTypeUserProfile") and user_id is not None:
+                return types.KeyboardInlineButton(
+                    text,
+                    types.InlineButtonTypeUserProfile(user_id),
+                    style=Button._get_style(None, None)
+                )
+
+        if hasattr(types, "InputKeyboardButtonUserProfile"):
+            return types.InputKeyboardButtonUserProfile(text, input_user)
+
+        return types.KeyboardButtonUserProfile(text, user_id)
