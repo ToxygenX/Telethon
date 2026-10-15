@@ -425,12 +425,24 @@ class _FileStream(io.IOBase):
 # endregion
 
 def get_running_loop():
+    """Return the running loop, or create/set one if none exists.
+
+    Python 3.10+ (especially 3.12+/3.14) no longer auto-creates an
+    event loop on ``get_event_loop()`` in the main thread, which breaks
+    Telethon clients that access ``client.loop`` during sync startup.
+    """
     try:
         return asyncio.get_running_loop()
     except RuntimeError:
-        try:
-            return asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        pass
+
+    try:
+        loop = asyncio.get_event_loop_policy().get_event_loop()
+        if loop is not None and not loop.is_closed():
             return loop
+    except RuntimeError:
+        pass
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    return loop
